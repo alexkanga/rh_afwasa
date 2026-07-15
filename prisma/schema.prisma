@@ -1,0 +1,356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ORGANIZATIONAL STRUCTURE ============
+
+model Direction {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  code        String?      @unique
+  description String?
+  employees   Employee[]
+  departments Department[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  name        String
+  code        String?
+  description String?
+  directionId String
+  direction   Direction @relation(fields: [directionId], references: [id], onDelete: Restrict)
+  employees   Employee[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([name, directionId])
+}
+
+// ============ AUTH & ROLES ============
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String   @default("[]")
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  name         String
+  roleId       String
+  role         Role      @relation(fields: [roleId], references: [id])
+  employeeId   String?   @unique
+  employee     Employee? @relation(fields: [employeeId], references: [id])
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ============ EMPLOYEES ============
+
+model Employee {
+  id               String      @id @default(cuid())
+  matricule        String      @unique
+  lastName         String
+  firstName        String
+  sex              String?
+  dateOfBirth      DateTime?
+  placeOfBirth     String?
+  nationality      String      @default("IVOIRIENNE")
+  idNumber         String?
+  maritalStatus    String?
+  numberOfChildren Int         @default(0)
+  address          String?
+  personalPhone    String?
+  email            String?
+  emergencyContact String?
+  emergencyPhone   String?
+  currentPosition  String?
+  departmentId     String?
+  department       Department? @relation(fields: [departmentId], references: [id])
+  directionId      String?
+  direction        Direction?  @relation(fields: [directionId], references: [id])
+  workLocation     String?
+  status           String      @default("Actif")
+  hireDate         DateTime?
+  cnpsNumber       String?
+  photoUrl         String?
+  user             User?
+  contracts        Contract[]
+  salaryProfiles   SalaryProfile[]
+  payrollLines     PayrollLine[]
+  departures       Departure[]
+  payslipArchives  PayslipArchive[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([directionId])
+  @@index([departmentId])
+  @@index([status])
+}
+
+// ============ CONTRACTS ============
+
+model Contract {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       String
+  startDate  DateTime
+  endDate    DateTime?
+  status     String   @default("Actif")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([endDate])
+}
+
+// ============ SALARY PROFILES (VERSIONED) ============
+
+model SalaryProfile {
+  id                   String      @id @default(cuid())
+  employeeId           String
+  employee             Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  baseSalary           Int         @default(0)
+  sursalary            Int         @default(0)
+  igrParts             Float       @default(1)
+  cmuEmployeeCount     Int         @default(1)
+  cmuEmployerCount     Int         @default(1)
+  transportAllowance   Int         @default(0)
+  taxablePrimes        Int         @default(0)
+  taxableBenefits      Int         @default(0)
+  nonTaxableAllowances Int         @default(0)
+  atRate               Float?
+  specificCnpsBase     Int?
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  status               String      @default("Actif")
+  version              Int         @default(1)
+  comment              String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @default(now())
+
+  @@index([employeeId])
+  @@index([effectiveFrom])
+  payrollLines         PayrollLine[]
+}
+
+// ============ PAYROLL PARAMETERS (VERSIONED) ============
+
+model PayrollParameter {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  value        Float
+  unit         String?
+  description  String?
+  source       String?
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  status       String   @default("Actif")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([code])
+  @@index([effectiveFrom])
+}
+
+// ============ ITS TAX BRACKETS (VERSIONED) ============
+
+model TaxBracketITS {
+  id            String   @id @default(cuid())
+  lowerBound    Int
+  upperBound    Int
+  rate          Float
+  label         String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  order         Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([effectiveFrom])
+}
+
+// ============ RICF SCALE (VERSIONED) ============
+
+model RicfScale {
+  id            String   @id @default(cuid())
+  igrParts      Float    @unique
+  monthlyAmount Int
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============ PAYROLL PERIODS ============
+
+model PayrollPeriod {
+  id           String        @id @default(cuid())
+  label        String
+  startDate    DateTime
+  endDate      DateTime
+  paymentDate  DateTime
+  status       String        @default("Brouillon")
+  totalGross   Int           @default(0)
+  totalNet     Int           @default(0)
+  totalCharges Int           @default(0)
+  lineCount    Int           @default(0)
+  notes        String?
+  payrollLines PayrollLine[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([startDate, endDate])
+  @@index([status])
+}
+
+// ============ PAYROLL LINES (BULLETINS) ============
+
+model PayrollLine {
+  id                   String         @id @default(cuid())
+  periodId             String
+  period               PayrollPeriod  @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  salaryProfileId      String?
+  salaryProfile        SalaryProfile? @relation(fields: [salaryProfileId], references: [id])
+  employeeId           String
+  employee             Employee       @relation(fields: [employeeId], references: [id])
+  matricule            String?
+  seniorityYears       Int            @default(0)
+  seniorityRate        Float          @default(0)
+  seniorityBonus       Int            @default(0)
+  baseSalary           Int            @default(0)
+  sursalary            Int            @default(0)
+  transportExempt      Int            @default(0)
+  transportTaxable     Int            @default(0)
+  taxablePrimes        Int            @default(0)
+  taxableBenefits      Int            @default(0)
+  nonTaxableGains      Int            @default(0)
+  grossTaxable         Int            @default(0)
+  cnpsBase             Int            @default(0)
+  cnpsEmployee         Int            @default(0)
+  cmuEmployee          Int            @default(0)
+  ricf                 Int            @default(0)
+  its                  Int            @default(0)
+  otherDeductions      Int            @default(0)
+  totalDeductions      Int            @default(0)
+  cnpsEmployer         Int            @default(0)
+  familyAllowances      Int            @default(0)
+  workAccident         Int            @default(0)
+  maternityInsurance   Int            @default(0)
+  cmuEmployer          Int            @default(0)
+  isLocalEmployer      Int            @default(0)
+  apprenticeshipTax    Int            @default(0)
+  fpcMonthly           Int            @default(0)
+  fpcEndOfYear         Int            @default(0)
+  totalEmployerCharges Int            @default(0)
+  totalGross           Int            @default(0)
+  netPayable           Int            @default(0)
+  totalEmployerCost    Int            @default(0)
+  status               String         @default("Calculé")
+  controlStatus        String?
+  notes                String?
+  calculationSnapshot  Json?
+  reprocessHistory     Json?
+  reprocessCount       Int            @default(0)
+  payslipArchives      PayslipArchive[]
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@unique([periodId, employeeId])
+  @@index([periodId])
+  @@index([employeeId])
+}
+
+// ============ DEPARTURES ============
+
+model Departure {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  reason        String
+  type          String
+  departureDate DateTime
+  status        String   @default("Enregistré")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([departureDate])
+}
+
+// ============ IMPORT BATCHES ============
+
+model ImportBatch {
+  id          String   @id @default(cuid())
+  type        String
+  fileName    String
+  totalRows   Int      @default(0)
+  successRows Int      @default(0)
+  errorRows   Int      @default(0)
+  errors      Json?
+  status      String   @default("Terminé")
+  importedBy  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+}
+
+// ============ AUDIT LOGS ============
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String?
+  userEmail String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+// ============ PAYSLIP ARCHIVES ============
+
+model PayslipArchive {
+  id            String      @id @default(cuid())
+  payrollLineId String
+  payrollLine   PayrollLine @relation(fields: [payrollLineId], references: [id], onDelete: Cascade)
+  employeeId    String
+  employee      Employee    @relation(fields: [employeeId], references: [id])
+  trigger       String
+  delta         Json?
+  snapshot      Json?
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now())
+
+  @@index([payrollLineId])
+  @@index([employeeId])
+  @@index([trigger])
+  @@index([createdAt])
+}
