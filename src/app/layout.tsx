@@ -1,22 +1,22 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { Toaster } from 'sonner'
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import "./globals.css"
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: 'RH-AFWASA — Gestion des Ressources Humaines',
-  description: "Système de gestion des ressources humaines et de la paie — Association Africaine de l'Eau et de l'Assainissement",
+  title: "Mon Projet",
+  description: "Projet Next.js",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="fr" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans`}>
-        {children}
-        <Toaster position="top-right" richColors closeButton />
-      </body>
+    <html lang="fr">
+      <body className={inter.className}>{children}</body>
     </html>
   )
 }
